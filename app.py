@@ -1,6 +1,6 @@
 import streamlit as st
 import tempfile
-import cv2
+import os
 
 from fusion import multimodal_fusion
 from text_risk import text_risk_score
@@ -8,6 +8,14 @@ from audio_risk import audio_risk_score
 from video_risk import video_risk_score
 from safety import crisis_detect
 from multilingual import translate_to_english
+
+# --------------------------------------------------
+# ENV CHECK (CLOUD vs LOCAL)
+# --------------------------------------------------
+IS_CLOUD = "STREAMLIT_SERVER_RUNNING" in os.environ
+
+if not IS_CLOUD:
+    import cv2
 
 # --------------------------------------------------
 # PAGE CONFIG
@@ -19,17 +27,12 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
-# CUSTOM CSS (COLORS + POLISH)
+# CUSTOM CSS
 # --------------------------------------------------
 st.markdown("""
 <style>
+body { background-color: #0e1117; }
 
-/* Base */
-body {
-    background-color: #0e1117;
-}
-
-/* Generic Card */
 .card {
     border-radius: 18px;
     padding: 22px;
@@ -39,31 +42,20 @@ body {
     transition: all 0.25s ease;
 }
 
-/* Hover */
 .card:hover {
     transform: translateY(-4px);
     box-shadow: 0 12px 40px rgba(0,0,0,0.35);
 }
 
-/* Cool color cards */
-.text-card {
-    background: linear-gradient(135deg, #1e3c72, #2a5298);
-}
-
-.audio-card {
-    background: linear-gradient(135deg, #134e5e, #71b280);
-}
-
-.video-card {
-    background: linear-gradient(135deg, #42275a, #734b6d);
-}
+.text-card { background: linear-gradient(135deg, #1e3c72, #2a5298); }
+.audio-card { background: linear-gradient(135deg, #134e5e, #71b280); }
+.video-card { background: linear-gradient(135deg, #42275a, #734b6d); }
 
 .result-card {
     background: rgba(255,255,255,0.04);
     animation: fadeUp 0.6s ease-out;
 }
 
-/* Text */
 .soft-text {
     color: #e0e0e0;
     font-size: 14px;
@@ -80,30 +72,20 @@ body {
     font-size: 18px;
 }
 
-/* Risk colors */
 .risk-low { color: #00e676; font-weight: 700; }
 .risk-mid { color: #ffd54f; font-weight: 700; }
 .risk-high { color: #ff5252; font-weight: 700; }
 
-/* Animation */
 @keyframes fadeUp {
-    from {
-        opacity: 0;
-        transform: translateY(12px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
-/* Mobile */
 @media (max-width: 768px) {
     .big-title { font-size: 32px; }
     .subtitle { font-size: 16px; }
     .card { padding: 18px; }
 }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -116,15 +98,12 @@ if "camera_on" not in st.session_state:
 # --------------------------------------------------
 # HEADER
 # --------------------------------------------------
-st.markdown(
-    """
-    <div style='text-align:center; margin-bottom:30px;'>
-        <div class='big-title'>💙 MindCare</div>
-        <div class='subtitle'>Multimodal Emotional Insight System</div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown("""
+<div style='text-align:center; margin-bottom:30px;'>
+    <div class='big-title'>💙 MindCare</div>
+    <div class='subtitle'>Multimodal Emotional Insight System</div>
+</div>
+""", unsafe_allow_html=True)
 
 st.info("This tool provides emotional insight and support — not a medical diagnosis.")
 
@@ -139,8 +118,12 @@ def toggle_camera():
 st.sidebar.checkbox(
     "Enable Webcam",
     value=st.session_state.camera_on,
-    on_change=toggle_camera
+    on_change=toggle_camera,
+    disabled=IS_CLOUD
 )
+
+if IS_CLOUD:
+    st.sidebar.caption("Webcam disabled on cloud deployment.")
 
 st.sidebar.caption("Data is processed locally and not stored.")
 
@@ -152,7 +135,7 @@ st.caption("You may use any one input or a combination of all three.")
 
 col1, col2, col3 = st.columns(3)
 
-# -------- TEXT CARD --------
+# -------- TEXT --------
 with col1:
     st.markdown("<div class='card text-card'>", unsafe_allow_html=True)
     st.markdown("### 📝 Text Input")
@@ -165,19 +148,16 @@ with col1:
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
-# -------- AUDIO CARD --------
+# -------- AUDIO --------
 with col2:
     st.markdown("<div class='card audio-card'>", unsafe_allow_html=True)
     st.markdown("### 🎤 Audio Input")
     st.markdown("<div class='soft-text'>Your voice tone and emotion are analyzed</div>", unsafe_allow_html=True)
 
-    audio_file = st.file_uploader(
-        "",
-        type=["wav"]
-    )
+    audio_file = st.file_uploader("", type=["wav"])
     st.markdown("</div>", unsafe_allow_html=True)
 
-# -------- VIDEO CARD --------
+# -------- VIDEO --------
 video_risk = None
 
 with col3:
@@ -185,7 +165,12 @@ with col3:
     st.markdown("### 📷 Video Input")
     st.markdown("<div class='soft-text'>Facial expressions are analyzed</div>", unsafe_allow_html=True)
 
-    if st.session_state.camera_on:
+    if IS_CLOUD:
+        st.markdown(
+            "<div class='soft-text'>Webcam analysis works in local deployment only.</div>",
+            unsafe_allow_html=True
+        )
+    elif st.session_state.camera_on:
         cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         frame_box = st.image([])
 
@@ -208,8 +193,7 @@ text_risk = None
 audio_risk = None
 reasons = []
 
-# ---- TEXT (MULTILINGUAL) ----
-if text is not None and len(text.strip()) > 0:
+if text and text.strip():
     translated_text, detected_lang = translate_to_english(text)
 
     if crisis_detect(translated_text):
@@ -226,7 +210,6 @@ if text is not None and len(text.strip()) > 0:
         elif text_risk == 1:
             reasons.append("Mild negative sentiment detected in text")
 
-# ---- AUDIO ----
 if audio_file:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
         tmp.write(audio_file.read())
@@ -238,7 +221,7 @@ if audio_file:
         reasons.append("Stressed or tense vocal tone detected")
 
 # --------------------------------------------------
-# RESULT (ALWAYS VISIBLE + EXPLAINABLE)
+# RESULT
 # --------------------------------------------------
 st.markdown("<div class='card result-card'>", unsafe_allow_html=True)
 st.markdown("## 🧠 Emotional Insight")
@@ -265,22 +248,18 @@ else:
 
     st.markdown(f"**Confidence:** `{confidence}%`")
 
-    # -------- EXPLANATION --------
     st.markdown("### 🔍 Why this result?")
-
     if reasons:
         for r in reasons:
             st.write("•", r)
     else:
         if final_risk == "LOW":
             st.write("• No strong negative emotional indicators were detected.")
-            st.write("• Your text, voice, and facial expressions appear emotionally stable.")
+            st.write("• Your inputs appear emotionally stable.")
         elif final_risk == "MEDIUM":
-            st.write("• Some mild stress-related emotional signals were detected.")
-            st.write("• These may indicate temporary emotional strain.")
+            st.write("• Some mild stress-related signals were detected.")
         else:
             st.write("• Multiple strong negative emotional indicators were detected.")
-            st.write("• This suggests a higher level of emotional distress.")
 
 st.markdown("</div>", unsafe_allow_html=True)
 
