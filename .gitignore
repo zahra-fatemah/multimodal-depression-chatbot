@@ -1,0 +1,19 @@
+# Virtual environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Model files
+models/*.h5
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/
+
+# Environment variables
+.env
