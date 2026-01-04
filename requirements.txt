@@ -1,0 +1,9 @@
+streamlit
+tensorflow
+opencv-python-headless
+librosa
+numpy
+soundfile
+textblob
+langdetect
+deep-translator
